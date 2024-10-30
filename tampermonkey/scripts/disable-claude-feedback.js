@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Hide Claude Feedback Buttons
 // @namespace    http://tampermonkey.net/
-// @version      1.4
+// @version      1.5
 // @description  Hides feedback buttons on Claude interface with console logging
 // @author       takuya fujisawa
 // @match        https://claude.ai/*
