@@ -5,8 +5,8 @@
 // @description  Hides feedback buttons on Claude interface with console logging
 // @author       takuya fujisawa
 // @match        https://claude.ai/*
-// @updateURL    https://raw.githubusercontent.com/weseek/claude-utils/refs/heads/main/tampermonkey/scripts/disable-claude-feedback.js
-// @downloadURL  https://raw.githubusercontent.com/weseek/claude-utils/refs/heads/main/tampermonkey/scripts/disable-claude-feedback.js
+// @updateURL    https://raw.githubusercontent.com/weseek/claude-utils/refs/heads/main/tampermonkey/scripts/disable-claude-feedback.user.js
+// @downloadURL  https://raw.githubusercontent.com/weseek/claude-utils/refs/heads/main/tampermonkey/scripts/disable-claude-feedback.user.js
 // @grant        none
 // @run-at       document-body
 // ==/UserScript==
