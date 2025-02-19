@@ -1,12 +1,12 @@
 // ==UserScript==
 // @name         Hide Claude Feedback Buttons
 // @namespace    http://tampermonkey.net/
-// @version      1.9
+// @version      2.0
 // @description  Hides feedback buttons on Claude interface with console logging
 // @author       takuya fujisawa
 // @match        https://claude.ai/*
-// @updateURL    https://raw.githubusercontent.com/weseek/claude-utils/refs/heads/main/tampermonkey/scripts/disable-claude-feedback.user.js
-// @downloadURL  https://raw.githubusercontent.com/weseek/claude-utils/refs/heads/main/tampermonkey/scripts/disable-claude-feedback.user.js
+// @updateURL    https://raw.githubusercontent.com/weseek/claude-utils/refs/heads/main/disable-claude-feedback/tampermonkey/disable-claude-feedback.user.js
+// @downloadURL  https://raw.githubusercontent.com/weseek/claude-utils/refs/heads/main/disable-claude-feedback/tampermonkey/disable-claude-feedback.user.js
 // @grant        none
 // @run-at       document-end
 // ==/UserScript==
