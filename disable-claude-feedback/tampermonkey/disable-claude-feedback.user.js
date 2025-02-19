@@ -1,18 +1,16 @@
 // ==UserScript==
 // @name         Hide Claude Feedback Buttons
 // @namespace    http://tampermonkey.net/
-// @version      1.8
+// @version      1.9
 // @description  Hides feedback buttons on Claude interface with console logging
 // @author       takuya fujisawa
 // @match        https://claude.ai/*
 // @updateURL    https://raw.githubusercontent.com/weseek/claude-utils/refs/heads/main/tampermonkey/scripts/disable-claude-feedback.user.js
 // @downloadURL  https://raw.githubusercontent.com/weseek/claude-utils/refs/heads/main/tampermonkey/scripts/disable-claude-feedback.user.js
 // @grant        none
-// @run-at       document-body
+// @run-at       document-end
 // ==/UserScript==
 
-
-// 更新時には↑の @version を足してください
 (function() {
     'use strict';
 
@@ -26,9 +24,25 @@
         hide: 'background: #FF5722; color: white; padding: 2px 5px; border-radius: 3px;'
     };
 
+    // フィードバックボタンを特定するセレクタ配列
+    const BUTTON_SELECTORS = [
+        // title属性でのマッチング
+        'button[title="Share positive feedback"]',
+        'button[title="Report issue"]',
+        // aria-label属性でのマッチング（下位互換性用）
+        'button[aria-label="Share positive feedback"]',
+        'button[aria-label="Report issue"]',
+        // クラス名でのマッチング（下位互換性用）
+        '.claude-feedback-buttons',
+        // SVGのパスパターンでのマッチング（新規追加）
+        'button:has(svg path[d^="M234,80.12"])',  // Positive feedback SVG
+        'button:has(svg path[d^="M239.82,157"])', // Negative feedback SVG
+        // 追加のSVGマッチング
+        'button:has(svg[data-state="closed"])'
+    ];
+
     // スタイルを作成して適用する関数
     function addStyle() {
-        // 既存のスタイルを確認
         if (document.getElementById(STYLE_ID)) {
             return;
         }
@@ -36,8 +50,12 @@
         const styleSheet = document.createElement("style");
         styleSheet.id = STYLE_ID;
         styleSheet.textContent = `
-            button[title="Share positive feedback"],
-            button[title="Report issue"] {
+            ${BUTTON_SELECTORS.join(',')} {
+                display: none !important;
+            }
+            /* SVGを直接含むボタンの非表示 */
+            button svg[data-state="closed"],
+            button:has(svg[data-state="closed"]) {
                 display: none !important;
             }
         `;
@@ -45,15 +63,31 @@
         console.log(`%c${SCRIPT_NAME}%c スタイルシートを追加しました`, logStyles.info, '');
     }
 
+    // SVGのパスパターンをチェックする関数
+    function hasFeedbackSVG(element) {
+        const svgPaths = element.querySelectorAll('svg path');
+        const feedbackPathPatterns = [
+            'M234,80.12',  // Positive feedback SVG pattern
+            'M239.82,157'  // Negative feedback SVG pattern
+        ];
+
+        return Array.from(svgPaths).some(path => {
+            const d = path.getAttribute('d');
+            return feedbackPathPatterns.some(pattern => d && d.startsWith(pattern));
+        });
+    }
+
     // フィードバックボタンを監視して非表示にする
     function hideFeedbackButtons() {
-        const buttons = document.querySelectorAll('button[title="Share positive feedback"], button[title="Report issue"]');
+        // セレクタベースの検索
+        const buttons = document.querySelectorAll(BUTTON_SELECTORS.join(','));
+
         if (buttons.length > 0) {
             buttons.forEach(button => {
                 if (button.style.display !== 'none') {
                     button.style.display = 'none';
                     console.log(
-                        `%c${SCRIPT_NAME}%c フィードバックボタンを非表示にしました: %c${button.title}`,
+                        `%c${SCRIPT_NAME}%c フィードバックボタンを非表示にしました: %c${button.getAttribute('title') || button.getAttribute('aria-label') || 'SVG Feedback Button'}`,
                         logStyles.hide,
                         '',
                         'color: #FF5722;'
@@ -61,42 +95,86 @@
                 }
             });
         }
+
+        // SVGパターンベースの検索
+        document.querySelectorAll('button').forEach(button => {
+            if (hasFeedbackSVG(button)) {
+                button.style.display = 'none';
+                console.log(
+                    `%c${SCRIPT_NAME}%c SVGパターンによりフィードバックボタンを非表示にしました`,
+                    logStyles.hide,
+                    ''
+                );
+            }
+        });
     }
 
-    // ページロード時に実行
-    function init() {
-        console.log(`%c${SCRIPT_NAME}%c 初期化中...`, logStyles.info, '');
+    // ボタンが見つかるまで定期的にチェック
+    function checkForButtons() {
+        const checkInterval = setInterval(() => {
+            const buttons = document.querySelectorAll(BUTTON_SELECTORS.join(','));
+            const svgButtons = Array.from(document.querySelectorAll('button')).filter(hasFeedbackSVG);
 
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', () => {
-                addStyle();
+            if (buttons.length > 0 || svgButtons.length > 0) {
                 hideFeedbackButtons();
-            });
-        } else {
-            addStyle();
-            hideFeedbackButtons();
-        }
+                clearInterval(checkInterval);
+                setupMutationObserver();
+            }
+        }, 500); // 500ミリ秒ごとにチェック
 
-        // 動的に追加される要素のために監視を設定
+        // 30秒後にチェックを停止
+        setTimeout(() => {
+            clearInterval(checkInterval);
+            setupMutationObserver();
+        }, 30000);
+    }
+
+    // 動的な変更を監視するMutationObserverの設定
+    function setupMutationObserver() {
         const observer = new MutationObserver((mutations) => {
-            const hasNewButtons = mutations.some(mutation =>
-                Array.from(mutation.addedNodes).some(node =>
-                    node.nodeType === 1 &&
-                    (node.querySelector?.('button[title="Share positive feedback"]') ||
-                     node.querySelector?.('button[title="Report issue"]'))
-                )
-            );
+            let shouldHideButtons = false;
 
-            if (hasNewButtons) {
+            mutations.forEach(mutation => {
+                // 新しく追加されたノードのチェック
+                mutation.addedNodes.forEach(node => {
+                    if (node.nodeType === 1) { // Element node
+                        // セレクタまたはSVGパターンでのマッチをチェック
+                        if (node.matches?.(BUTTON_SELECTORS.join(',')) ||
+                            (node.tagName === 'BUTTON' && hasFeedbackSVG(node)) ||
+                            node.querySelector?.(BUTTON_SELECTORS.join(',')) ||
+                            Array.from(node.querySelectorAll('button')).some(hasFeedbackSVG)) {
+                            shouldHideButtons = true;
+                        }
+                    }
+                });
+
+                // 属性の変更をチェック
+                if (mutation.type === 'attributes' &&
+                    (mutation.target.tagName === 'BUTTON' || mutation.target.tagName === 'SVG')) {
+                    shouldHideButtons = true;
+                }
+            });
+
+            if (shouldHideButtons) {
                 hideFeedbackButtons();
             }
         });
 
         observer.observe(document.body, {
             childList: true,
-            subtree: true
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['title', 'aria-label', 'd', 'data-state']
         });
 
+        console.log(`%c${SCRIPT_NAME}%c MutationObserver を設定しました`, logStyles.info, '');
+    }
+
+    // ページロード時に実行
+    function init() {
+        console.log(`%c${SCRIPT_NAME}%c 初期化中...`, logStyles.info, '');
+        addStyle();
+        checkForButtons();
         console.log(`%c${SCRIPT_NAME}%c 正常に初期化されました`, logStyles.success, '');
     }
 
